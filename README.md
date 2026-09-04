@@ -85,4 +85,6 @@ pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバー�
 
 
 ## 参考資料
+- [UbuntuにOpenLDAPサーバーを構築](https://qiita.com/cffnpwr/items/be903005e291d0ece514)
 
+- [NFSの設定方法](https://qiita.com/Torahugu/items/be0f12d36957679bd294)

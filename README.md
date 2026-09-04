@@ -18,18 +18,82 @@ LDAPによるユーザー認証と、NFSによるホームディレクトリ共�
 
 ## 実施内容
 ### 1.Linuxサーバーを構築（2台）
-- 仮想環境上にLinuxサーバーを構築（VirtualBoxを使用）
+#### 仮想環境上にLinuxサーバーを構築（VirtualBoxを使用）
 
 ### 2.OpenLDAPサーバーを構築
-- slapdとldap-utilsのインストール
+#### slapdとldap-utilsのインストール
 ```bash
 $ sudo apt install slapd ldap-utils
 ```
-- ドメインの再設定
+> slapdインストール時にLDAPサーバーの管理者パスワードを設定する必要あり（ex:P@ssw0rd）
+
+#### slapdの再設定（ドメイン修正）
+※初期状態ではドメインが "nodomain" になっているため再設定を行う
 ```bash
 $ sudo dpkg-reconfigure slapd
 ```
-- ユーザーとグループ（OU）の追加
+#### 主な設定項目：
+- Omit OpenLDAP server configuration?: No
+- DNS domain name: example.com
+- Organization name: example
+- Administrator password: （slapdインストール時に設定した管理者パスワード）
+#### 設定の確認
+```bash
+$ sudo slapcat
+```
+>ここで設定したドメインはLDAPのDNに影響するため注意
+
+#### ユーザーとグループ（OU）の追加
+- base.ldifの作成（OU）
+```bash
+dn:ou=people,dc=example,dc=com
+objectClass:organizationalUnit
+ou:people
+
+dn:ou=groups,dc=example,dc=com
+objectClass:organizationalUnit
+ou:groups 
+```
+#### base.ldifをLDAPに反映
+```bash
+$ ldapadd -x -D "cn=admin,dc=example,dc=com" -W -f base.ldif
+```
+#### 結果の確認
+```bash
+$ ldapsearch -x -b "dc=example,dc=com"
+```
+- ldapuser.ldifの作成（ユーザー）
+
+#### 作成するユーザー用のパスワードを作成（ハッシュ化されたパスワード）
+```bash
+$ slappasswd
+New password:
+Re-enter new password:
+{SSHA}xxxxxxxxxxxxxxxx　←　作成されたパスワード
+```
+
+```bash
+dn: uid=testuser,ou=people,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+cn: testuser
+sn: testuser
+uid: testuser
+userPassword:slappasswdで作成したパスワード
+loginShell: /bin/bash
+uidNumber: 2000
+gidNumber: 2000
+homeDirectory: /home/testuser
+
+
+dn: cn=testuser,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+cn: testuser
+gidNumber: 2000
+memberUid: testuser
+
+```
 > ファイアウォール設定している場合はポート開放（389）をしておく必要あり
 
 ### 3.Linuxクライアントサーバーを構築

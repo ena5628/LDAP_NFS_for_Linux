@@ -1,20 +1,79 @@
 # LDAP + NFS を用いた認証・ホームディレクトリ共有の検証
 
 ## 概要
-LDAPを用いたユーザー認証基盤と、NFSによるホームディレクトリ共有の構成を検証しました。
-LinuxクライアントからLDAPユーザーでログインし、NFS上のホームディレクトリを利用できる環境を構築しています。
+LDAPによるユーザー認証と、NFSによるホームディレクトリ共有を組み合わせ、
+複数サーバー間で同一ユーザー環境を利用できる構成を検証した
 
 ## 構成
 ![構成図](LDAP_NFS.drawio.png)
 
+> 自PCのスペック制約により、本来は分離するLDAPサーバーとNFSサーバーを1台に集約して構成しています。
 
 ## 実施内容
+### 1.Linuxサーバーを構築（2台）
+- 仮想環境上にLinuxサーバーを構築（VirtualBoxを使用）
 
+### 2.OpenLDAPサーバーを構築
+- slapdとldap-utilsのインストール
+```bash
+$ sudo apt install slapd ldap-utils
+```
+- ドメインの再設定
+```bash
+$ sudo dpkg-reconfigure slapd
+```
+- ユーザーとグループ（OU）の追加
+> ファイアウォール設定している場合はポート開放（389）をしておく必要あり
 
-## 学んだこと
+### 3.Linuxクライアントサーバーを構築
+-  libnss-ldap, libpam-ldap, nslcd をインストール
+```bash
+$ sudo apt install libnss-ldapd libpam-ldapd ldap-utils
+```
+> インストール時の設定でLDAPサーバーのIPアドレスを指定する
+- 動作確認（作成したユーザーにssh接続）
 
+### 4.NFSの設定(LDAP側)
+- LDAPサーバーでnfs-kernel-serverのインストール＆サービス起動
+```bash
+$ sudo apt install nfs-kernel-server
+$ sudo systemctl start nfs-kernel-server.service
+```
+- /etc/exportsに設定を記載し、反映(同一ネットワーク部のサーバーに対して読み書き許可)
+> ファイアウォール設定している場合はポート開放（2049）をしておく必要あり
+  
+### 5.NFSの設定(クライアント側)
+- nfs-commonのインストール
+```bash
+$ sudo apt install nfs-common
+```
+- /etc/fstabに設定を記載し、マウントする（LDAPサーバー:/home -> /home）
+> autofsだとうまく動作しなかったため、fstabを推奨
+
+### 6. ホームディレクトリ自動作成設定
+- pam_mkhomedir を設定し、LDAPユーザーの初回ログイン時に
+  ホームディレクトリが自動作成されるように構成
+設定場所
+```bash
+$ sudo vim /etc/pam.d/common-session
+```
+追加する
+```bash
+$ session required pam_mkhomedir.so skel=/etc/skel umask=0022
+```
+
+## 動作確認
+- LDAPユーザーでSSHログイン可能であることを確認
+- NFSにより/homeディレクトリが共有されることを確認
+- 初回ログイン時にホームディレクトリが自動作成されることを確認
 
 ## 課題・詰まった点
+pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバーか分からずにうまく動作しない問題が起きてしまいました。
+最終的にクライアントサーバー側の設定ファイルに追加することでうまく動作することができました。
+
+## 学んだこと
+ログイン処理をするほうでPAMが動くので今回の場合クライアント側で動くのでクライアント側でpam_mkdir設定することが必要だと学びました。
+実際にエラーや意図しない動作が起きた際に、ネット記事やAIツールを活用して調べてちゃんと原因まで理解していくことが大切だと感じました。
 
 
 ## 今後の課題

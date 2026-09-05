@@ -106,7 +106,6 @@ $ ldapsearch -x -b "dc=example,dc=com" "(uid=testuser)"
 
 ### ファイアーウォールの設定（ポートの開放）
 
-### ファイアーウォールの適用とポート開放
 ```bash
 $ sudo ufw status
 Status: inactive      ←　未設定状態

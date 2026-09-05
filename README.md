@@ -94,7 +94,34 @@ gidNumber: 2000
 memberUid: testuser
 
 ```
-> ファイアウォール設定している場合はポート開放（389）をしておく必要あり
+#### ldapuser.ldifをLDAPに反映
+```bash
+$ ldapadd -x -D "cn=admin,dc=example,dc=com" -W -f ldapuser.ldif
+```
+
+#### 結果の確認
+```bash
+$ ldapsearch -x -b "dc=example,dc=com" "(uid=testuser)"
+```
+
+### ファイアーウォールの設定（ポートの開放）
+
+### ファイアーウォールの適用とポート開放
+```bash
+$ sudo ufw status
+Status: inactive      ←　未設定状態
+
+$ sudo ufw allow ssh  ←　port(22)の開放
+$ sudo ufw allow 389  ←　port(389)の開放
+$ sudo ufw enable     ←　ファイアウォールの適用
+
+$ sudo ufw status
+22/tcp                     ALLOW       Anywhere               
+389                        ALLOW       Anywhere
+```
+> port(389)はLDAPの標準通信で使われるポート番号です
+
+> ※ファイアウォール有効化前にSSHポートを開放しておかないと、SSH接続が遮断されリモートログインできなくなるため注意する
 
 ### 3.Linuxクライアントサーバーを構築
 -  libnss-ldap, libpam-ldap, nslcd をインストール

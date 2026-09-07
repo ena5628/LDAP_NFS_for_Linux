@@ -31,17 +31,18 @@ $ sudo apt install slapd ldap-utils
 ※初期状態ではドメインが "nodomain" になっているため再設定を行う
 ```bash
 $ sudo dpkg-reconfigure slapd
-```
-#### 主な設定項目：
-- Omit OpenLDAP server configuration?: No
-- DNS domain name: example.com
-- Organization name: example
-- Administrator password: （slapdインストール時に設定した管理者パスワード）
-#### 設定の確認
-```bash
+
+# 主な設定項目：
+Omit OpenLDAP server configuration?: No
+DNS domain name: example.com
+Organization name: example
+Administrator password: （slapdインストール時に設定した管理者パスワード）
+
+# 設定の確認
 $ sudo slapcat
 ```
->ここで設定したドメインはLDAPのDNに影響するため注意
+
+>　ここで設定したドメインはLDAPのDNに影響するため注意
 
 #### ユーザーとグループ（OU）の追加
 - base.ldifの作成（OU）
@@ -57,13 +58,12 @@ ou:groups
 #### base.ldifをLDAPに反映
 ```bash
 $ ldapadd -x -D "cn=admin,dc=example,dc=com" -W -f base.ldif
-```
-#### 結果の確認
-```bash
+
+# 結果の確認
 $ ldapsearch -x -b "dc=example,dc=com"
 ```
-- ldapuser.ldifの作成（ユーザー）
 
+- ldapuser.ldifの作成（ユーザー）
 #### 作成するユーザー用のパスワードを作成（ハッシュ化されたパスワード）
 ```bash
 $ slappasswd
@@ -94,6 +94,7 @@ gidNumber: 1001
 memberUid: testuser
 
 ```
+
 #### ldapuser.ldifをLDAPに反映
 ```bash
 $ ldapadd -x -D "cn=admin,dc=example,dc=com" -W -f ldapuser.ldif
@@ -396,12 +397,10 @@ linux  testfile  testuser  ubuntu
 > testuserが入っているのがわかることから、/mnt/nfsはサーバーの/homeをマウントしていることがわかる
 ```
 
-
-
 ## 動作確認
 - LDAPユーザーでSSHログイン可能であることを確認
-- NFSにより/homeディレクトリが共有されることを確認
 - 初回ログイン時にホームディレクトリが自動作成されることを確認
+- NFSにより/homeディレクトリが共有されることを確認
 
 ## 課題・詰まった点
 pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバーか分からずにうまく動作しない問題が起きてしまいました。
@@ -418,6 +417,7 @@ pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバー�
 また、LDAPサーバーのユーザーの作成やフォルダのマウント方法を学び、実際の操作を通じてより理解を深めることができたと思います。
 
 実際にエラーや意図しない動作が起きた際に、ネット記事やAIツールを活用して調べてちゃんと原因まで理解していくことが大切だと感じました。
+AIはハルシネーションを起こすこともありますが、コマンド方法等の記述方法であったり、問題点を考えていくうえでとても役立ちました。
 
 今回の検証を行っているうえで、途中でエラーが出るような無駄な作業を行っていた場面もありましたが、とても勉強になりましたし、理解がより深まったように思います。
 

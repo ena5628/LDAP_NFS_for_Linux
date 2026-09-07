@@ -244,14 +244,16 @@ $ sudo apt install nfs-common
 
 #### マウント用のフォルダを作成
 ```bash
-$ mkdir home_nfs
+$ sudo mkdir -p /mnt/nfs
 ```
+> /homeを直接置き換えてしまうと、ローカルのユーザーが上書きされて消えてしまうので<br>
+>マウント用フォルダを作成する
 
 #### autofsをインストール
 ```bash
 $ sudo apt install autofs
 $ sudo vim /etc/auto.master.d
-/home   /etc/auto.home
+/mnt/nfs   /etc/auto.home
 
 # /etc/auto.homeの作成
 $ sudo vim /etc/auto.home
@@ -287,13 +289,113 @@ ssh testuser@192.168.11.13
 testuser@Ubuntu2204:~$pwd
 > /（ホームディレクトリが作成されていない）
 
-# ログイン時の画面にこんなものを発見
+# sshログイン時の画面にこんなものを発見
 Could not chdir to home directory /home/testuser: No such file or directory
 ```
-> autofsはアクセスされた瞬間にマウントするのに対し、pam
+> autofsはアクセスされた瞬間にマウントするのに対し、<br>
+pam_mkhomedirはログイン時にホームディレクトリを作成する.。<br><br>
+そのためログイン中に/mnt/nfs/testuserがまだマウントされておらず、ホームディレクトリが存在しない状態になる<br><br>
+そのため、ディレクトリが見つからずに、ログイン時にルートディレクトリを示すようになる
+
+#### autofsをやめてfstabで常時マウントにしてみる
+
+```bash
+# 設定ファイルの編集
+$  sudo vim /etc/fstab
+
+# 追加
+192.168.11.13:/home /mnt/nfs nfs defaults,_netdev 0 0
+
+# リロード
+sudo systemctl daemon-reload
+
+# マウント実行
+$ sudo mount -a
+
+# マウントされたか確認
+$ mount | grep nfs
+192.168.11.13:/home on /mnt/nfs type nfs4
+
+$ ls /mnt/nfs
+ローカルユーザー testuser
+```
+
+#### LDAPサーバー側の情報を変更（HomeDirectoryを/mnt/nfsを置き換えてログイン時にそこを開くようにする）
+```bash
+# ホームディレクトリ情報を変更する実行ファイルの作成（.ldif）
+$ sudo vim change_home.ldif
+
+dn: uid=testuser,ou=people,dc=example,dc=com
+changetype: modify
+replace: homeDirectory
+homeDirectory: /mnt/nfs/testuser
 
 
-- /etc/fstabに設定を記載し、マウントする（LDAPサーバー:/home -> /home）
+# 変更
+$ ldapmodify -x -D "cn=admin,dc=example,dc=com" -W -f change_home.ldif
+
+# 確認
+$ ldapsearch -x -D "cn=admin,dc=example,dc=com" -W -b "dc=example,dc=com" "(uid=testuser)" homeDirectory
+
+# testuser, people, example.com
+dn: uid=testuser,ou=people,dc=example,dc=com
+homeDirectory: /mnt/nfs/testuser
+
+
+# クライアント側で再起動
+$ sudo systemctl restart nslcd
+
+# sshでログインしてみる
+$ ssh testuser@192.168.11.13
+Last login: Mon Sep  7 00:24:26 2026 from 172.20.10.3
+testuser@Ubuntu2204:~$ pwd
+/mnt/nfs/testuser
+testuser@Ubuntu2204:~$
+> 無事に作成され、ログインできたことがわかる
+
+# サーバー側の/homeのtestuserを削除してみる
+$ rm -rf /home/testuser
+$ ls /home
+linux  testfile  ubuntu  user01
+
+# 再度sshでログイン（省略）
+testuser@Ubuntu2204:~$ pwd
+/mnt/nfs/testuser
+
+# サーバー側の/homeを見てみる
+root@Ubuntu2204:~# ls /home
+linux  testfile  ubuntu  user01
+> ※作成されていない！！
+> どこに作成されたのか調べてみる
+
+# サーバー側で場所を特定
+find / -name testuser
+/mnt/nfs/testuser
+> なぜか自動でサーバー側にmnt/nfsが作成され、そこに保存されていた
+> このことからLDAPのhomeDirectoryを元にユーザーディレクトリが作成されるので、ただ/homeの設定のままにしておけば/home内に作成される
+>LDAPユーザーのホームディレクトリの設定を(/home)元に戻す（手順は上記に操作を記載しているため省略）
+
+# 再度ログインしてみる
+
+# ログイン前（サーバーの/home）
+$ ls /home
+linux  testfile  ubuntu
+
+# sshでtestuserにログイン（省略）
+testuser@Ubuntu2204:~$ pwd
+/home/testuser
+
+# ログイン後（サーバーの/home）
+root@Ubuntu2204:/# ls /home
+linux  testfile  testuser  ubuntu
+> 無事作成されている！！
+
+# クライアント側の/mnt/nfsを見てみる
+$ ls /mnt/nfs
+linux  testfile  testuser  ubuntu
+> testuserが入っているのがわかることから、/mnt/nfsはサーバーの/homeをマウントしていることがわかる
+```
+
 
 
 ## 動作確認
@@ -317,6 +419,8 @@ pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバー�
 
 実際にエラーや意図しない動作が起きた際に、ネット記事やAIツールを活用して調べてちゃんと原因まで理解していくことが大切だと感じました。
 
+今回の検証を行っているうえで、途中でエラーが出るような無駄な作業を行っていた場面もありましたが、とても勉強になりましたし、理解がより深まったように思います。
+
 最後に、今回の検証で細かい設定までは理解できてなく、AI等を活用して解決したので、自分で考えて問題解決取り組む力を身に着ける必要があると感じました。
 
 
@@ -324,3 +428,5 @@ pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバー�
 - [UbuntuにOpenLDAPサーバーを構築](https://qiita.com/cffnpwr/items/be903005e291d0ece514)
 
 - [NFSの設定方法](https://qiita.com/Torahugu/items/be0f12d36957679bd294)
+
+- [簡単なufw設定まとめ](https://qiita.com/IndoorPond/items/4bda148a91b123f7e7e4)

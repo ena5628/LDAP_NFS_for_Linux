@@ -133,19 +133,42 @@ $ sudo apt install libnss-ldapd libpam-ldapd ldap-utils
 - libpam-ldapd(PAM) :  ログイン認証をする役割
 - nslcd             :  LDAPサーバーと通信をする実体プロセス（デーモン）  
 
-#### クライアントサーバー側の設定ファイルでLDAPサーバーの接続先情報を指定する
-```bash
-$ sudo vim /etc/nslcd.conf
-# URI情報の追加
-uri ldap://192.168.11.13
-> 複数指定する場合はuriを追加する必要あり
-```
+
 #### 動作確認
 
 - クライアントサーバーからnssでユーザー情報を取得できるか確認
 ```bash
 $ getent passwd testuser
+# 理想
 testuser:x:1001:1001::/home/testuser:/bin/sh
+# 何も返らなかった（空）
+```
+> ユーザー情報が返らなかったため、下記の設定ファイルを確認した（通常はインストール時に設定されているはず）　
+
+```bash
+# nslcd設定ファイル
+$ sudo vim /etc/nslcd.conf
+# URI情報の追加
+uri ldap://192.168.11.13
+> 複数指定する場合はuriを追加する必要あり
+binddn cn=admin,dc=example,dc=com
+bindpw LDAP管理者パスワード
+
+# nss設定ファイル
+$ sudo vim /etc/nswitch.conf
+# このような設定になっていればOK
+passwd:         files systemd ldap
+group:          files systemd ldap
+shadow:         files systemd ldap
+gshadow:        files systemd ldap
+
+> ※これでも治らなかったため
+sudo apt purge libnss-ldapd libpam-ldapd   # パッケージ削除
+sudo apt install libnss-ldapd libpam-ldapd # 再インストール
+
+$ getent passwd testuser
+testuser:x:1001:1001::/home/testuser:/bin/sh
+> 表示されました
 ```
 
 - クライアントサーバーからssh接続をしてログイン

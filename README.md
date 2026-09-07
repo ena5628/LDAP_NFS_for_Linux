@@ -106,6 +106,8 @@ $ ldapsearch -x -b "dc=example,dc=com" "(uid=testuser)"
 
 ### ファイアーウォールの設定（ポートの開放）
 
+#### LDAPサーバー側で設定
+
 ```bash
 $ sudo ufw status
 Status: inactive      ←　未設定状態
@@ -146,6 +148,11 @@ testuser:x:1001:1001::/home/testuser:/bin/sh
 > ユーザー情報が返らなかったため、下記の設定ファイルを確認した（通常はインストール時に設定されているはず）　
 
 ```bash
+# ファイアウォール設定の確認
+$ sudo ufw status
+22/tcp                     ALLOW       Anywhere               
+389                        ALLOW       Anywhere
+
 # nslcd設定ファイル
 $ sudo vim /etc/nslcd.conf
 # URI情報の追加
@@ -188,13 +195,46 @@ testuser@Ubuntu2204:~$
 
 
 ### 4.NFSの設定(LDAP側)
-- LDAPサーバーでnfs-kernel-serverのインストール＆サービス起動
+#### LDAPサーバーでnfs-kernel-serverのインストール＆サービス起動
 ```bash
 $ sudo apt install nfs-kernel-server
 $ sudo systemctl start nfs-kernel-server.service
 ```
-- /etc/exportsに設定を記載し、反映(同一ネットワーク部のサーバーに対して読み書き許可)
-> ファイアウォール設定している場合はポート開放（2049）をしておく必要あり
+- /etc/exportsに設定を記載し、反映（公開）
+```bash
+$ sudo vim /etc/exports
+# 追加（/homeを指定したネットワークの範囲内のサーバーたちに共有）
+/home 192.168.11.0/24(rw,sync,no_root_squash,no_subtree_check)
+> 複数指定したい場合は複数ネットワークを追加する
+
+# 設定を反映
+sudo exportfs -ar
+```
+
+### ファイアーウォールの設定（ポートの開放）
+
+#### LDAP/NFSサーバー側で設定
+```bash
+$ sudo ufw status
+22/tcp                     ALLOW       Anywhere               
+389                        ALLOW       Anywhere
+
+# 特定のipアドレスに制限
+$ sudo ufw allow from 192.168.11.0/24 to any port nfs 
+$ sudo ufw allow from 192.168.11.0/24 to any port 389
+
+# 389ポートの設定をIP制限したので元あったAnywhereの設定を削除
+$ sudo ufw numbered
+$ sudo ufw delete 削除する項目と一致する番号
+
+$ sudo ufw status
+2049                       ALLOW       192.168.11.0/24  
+22/tcp                     ALLOW       Anywhere         
+389                        ALLOW       192.168.11.0/24
+
+```
+> port(2049)はNFSの標準通信で使われるポート番号です
+
   
 ### 5.NFSの設定(クライアント側)
 - nfs-commonのインストール

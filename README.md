@@ -237,17 +237,36 @@ $ sudo ufw status
 
   
 ### 5.NFSの設定(クライアント側)
-- nfs-commonのインストール
+#### nfs-commonのインストール
 ```bash
 $ sudo apt install nfs-common
 ```
-- /etc/fstabに設定を記載し、マウントする（LDAPサーバー:/home -> /home）
-> autofsだとうまく動作しなかったため、fstabを推奨
+
+#### マウント用のフォルダを作成
+```bash
+$ mkdir home_nfs
+```
+
+#### autofsをインストール
+```bash
+$ sudo apt install autofs
+$ sudo vim /etc/auto.master.d
+/home   /etc/auto.home
+
+# /etc/auto.homeの作成
+$ sudo vim /etc/auto.home
+*  -fstype=nfs,rw  192.168.11.13:/home/&　　※ *=任意のユーザー,&=ユーザー名
+> これでアクセス時にマウントされるようにする
+
+# サービスの起動
+sudo systemctl start autofs.service
 
 ### 6. ホームディレクトリ自動作成設定
 - pam_mkhomedir を設定し、LDAPユーザーの初回ログイン時に
   ホームディレクトリが自動作成されるように構成
-設定場所
+
+#### 設定内容
+
 ```bash
 $ sudo vim /etc/pam.d/common-session
 ```
@@ -255,6 +274,27 @@ $ sudo vim /etc/pam.d/common-session
 ```bash
 $ session required pam_mkhomedir.so skel=/etc/skel umask=0022
 ```
+- pam_mkhomedir
+→ ユーザーのホームディレクトリが存在しない場合に自動作成する
+- skel=/etc/skel
+→ /etc/skel 配下の初期ファイル（.bashrc など）をコピー
+- umask=0022
+→ 作成されるディレクトリのパーミッション設定
+
+#### ssh接続でログインしてみる
+```bash
+ssh testuser@192.168.11.13
+testuser@Ubuntu2204:~$pwd
+> /（ホームディレクトリが作成されていない）
+
+# ログイン時の画面にこんなものを発見
+Could not chdir to home directory /home/testuser: No such file or directory
+```
+> autofsはアクセスされた瞬間にマウントするのに対し、pam
+
+
+- /etc/fstabに設定を記載し、マウントする（LDAPサーバー:/home -> /home）
+
 
 ## 動作確認
 - LDAPユーザーでSSHログイン可能であることを確認
@@ -276,6 +316,8 @@ pam_mkhomedirの追加先がNFSサーバーか、クライアントサーバー�
 また、LDAPサーバーのユーザーの作成やフォルダのマウント方法を学び、実際の操作を通じてより理解を深めることができたと思います。
 
 実際にエラーや意図しない動作が起きた際に、ネット記事やAIツールを活用して調べてちゃんと原因まで理解していくことが大切だと感じました。
+
+最後に、今回の検証で細かい設定までは理解できてなく、AI等を活用して解決したので、自分で考えて問題解決取り組む力を身に着ける必要があると感じました。
 
 
 ## 参考資料

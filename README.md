@@ -82,15 +82,15 @@ sn: testuser
 uid: testuser
 userPassword:slappasswdで作成したパスワード
 loginShell: /bin/bash
-uidNumber: 2000
-gidNumber: 2000
+uidNumber: 1001
+gidNumber: 1001
 homeDirectory: /home/testuser
 
 
 dn: cn=testuser,ou=groups,dc=example,dc=com
 objectClass: posixGroup
 cn: testuser
-gidNumber: 2000
+gidNumber: 1001
 memberUid: testuser
 
 ```
@@ -123,12 +123,46 @@ $ sudo ufw status
 > ※ファイアウォール有効化前にSSHポートを開放しておかないと、SSH接続が遮断されリモートログインできなくなるため注意する
 
 ### 3.Linuxクライアントサーバーを構築
--  libnss-ldap, libpam-ldap, nslcd をインストール
+#### libnss-ldap, libpam-ldap, nslcd をインストール
 ```bash
 $ sudo apt install libnss-ldapd libpam-ldapd ldap-utils
 ```
 > インストール時の設定でLDAPサーバーのIPアドレスを指定する
-- 動作確認（作成したユーザーにssh接続）
+
+- libnss-ldap(NSS)  :　ユーザー情報を取得する役割
+- libpam-ldapd(PAM) :  ログイン認証をする役割
+- nslcd             :  LDAPサーバーと通信をする実体プロセス（デーモン）  
+
+#### クライアントサーバー側の設定ファイルでLDAPサーバーの接続先情報を指定する
+```bash
+$ sudo vim /etc/nslcd.conf
+# URI情報の追加
+uri ldap://192.168.11.13
+> 複数指定する場合はuriを追加する必要あり
+```
+#### 動作確認
+
+- クライアントサーバーからnssでユーザー情報を取得できるか確認
+```bash
+$ getent passwd testuser
+testuser:x:1001:1001::/home/testuser:/bin/sh
+```
+
+- クライアントサーバーからssh接続をしてログイン
+```bash
+$ ssh testuser@192.168.11.13
+
+The authenticity of host '192.168.11.13' can't be established.
+ED25519 key fingerprint is SHA256:XXXXXXXXXXXX.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added '192.168.11.13' (ED25519) to the list of known hosts.
+testuser@172.20.XX.XX's password:（testuserに設定したパスワード）
+
+# ログイン成功
+testuser@Ubuntu2204:~$
+> LDAPサーバーを起動しておく必要あり
+```
+
 
 ### 4.NFSの設定(LDAP側)
 - LDAPサーバーでnfs-kernel-serverのインストール＆サービス起動
